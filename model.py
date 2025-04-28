@@ -8,6 +8,8 @@ import torchmetrics
 from ptflops import get_model_complexity_info
 from jiwer import wer
 
+from data import RussianNumberNormalizer
+
 
 class DigitHybridModel(pl.LightningModule):
     def __init__(self, input_dim=20, hidden_dim=256, output_dim=11, model_type='hybrid', rnn_type='lstm'):
@@ -82,7 +84,7 @@ class DigitHybridModel(pl.LightningModule):
         return decoded_sequences
 
     def training_step(self, batch, batch_idx):
-        spectrograms, targets, spec_lengths, target_lengths = batch
+        spectrograms, targets, spec_lengths, target_lengths, speaker_ids = batch
         outputs = self(spectrograms)
         outputs = outputs.log_softmax(2)
         
@@ -109,7 +111,7 @@ class DigitHybridModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        spectrograms, targets, spec_lengths, target_lengths = batch
+        spectrograms, targets, spec_lengths, target_lengths, speaker_ids = batch
         outputs = self(spectrograms)
         outputs = outputs.log_softmax(2)
         
@@ -118,27 +120,40 @@ class DigitHybridModel(pl.LightningModule):
         
         decoded_sequences = self.greedy_decode(outputs, adjusted_lengths)
         targets = targets.cpu().numpy()
+        normalizer = RussianNumberNormalizer()  # Create normalizer instance
         
         wers = []
         correct_predictions = 0
         total_predictions = len(decoded_sequences)
-        
-        for i in range(len(decoded_sequences)):
-            true = ''.join([str(t) for t in targets[i][:target_lengths[i]]])
-            pred = decoded_sequences[i]
+        cers = []
+
+        for i, (pred, true_seq, spk_id) in enumerate(zip(decoded_sequences, targets, speaker_ids)):
+            true = ''.join([str(t) for t in true_seq[:target_lengths[i]]])
             wers.append(wer(true, pred))
+            cer = self.compute_cer(true, pred)
+            cers.append(cer)
             
-            if true == pred:
-                correct_predictions += 1
+            self.log(f'val_cer_speaker_{spk_id}', cer, on_epoch=True)
+            
             if i < 3:
-                self.logger.experiment.add_text(f'val/prediction_{i}', 
-                                              f'True: {true}\nPred: {pred}\nWER: {wers[-1]:.4f}', 
-                                              self.global_step)
+                denorm_true = normalizer.denormalize(true)
+                denorm_pred = normalizer.denormalize(pred)
+                
+                self.logger.experiment.add_text(
+                    f'val/prediction_{i}', 
+                    f'Speaker: {spk_id}\n'
+                    f'True (normalized): {true}\n'
+                    f'Pred (normalized): {pred}\n'
+                    f'True (words): {denorm_true}\n'
+                    f'Pred (words): {denorm_pred}\n'
+                    f'CER: {cer:.4f}', 
+                    self.global_step
+                )
         
         self.log('val_loss', loss, on_epoch=True, prog_bar=True)
+        self.log('val_cer', sum(cers) / len(cers), on_epoch=True, prog_bar=True)
         self.log('val_wer', sum(wers) / len(wers), on_epoch=True, prog_bar=True)
-        self.log('val_accuracy', correct_predictions / total_predictions, on_epoch=True)
-        
+
         if batch_idx % 10 == 0:
             self.logger.experiment.add_image('val/spectrogram', 
                                            spectrograms[0].unsqueeze(0), 
@@ -147,6 +162,28 @@ class DigitHybridModel(pl.LightningModule):
             self.logger.experiment.add_histogram('val/output_distribution', 
                                                outputs[0], 
                                                self.global_step)
+
+    def compute_cer(self, reference, hypothesis):
+        ref_chars = list(reference)
+        hyp_chars = list(hypothesis)
+        d = [[0 for _ in range(len(hyp_chars) + 1)] for _ in range(len(ref_chars) + 1)]
+        
+        for i in range(len(ref_chars) + 1):
+            d[i][0] = i
+        for j in range(len(hyp_chars) + 1):
+            d[0][j] = j
+        
+        for i in range(1, len(ref_chars) + 1):
+            for j in range(1, len(hyp_chars) + 1):
+                if ref_chars[i-1] == hyp_chars[j-1]:
+                    d[i][j] = d[i-1][j-1]
+                else:
+                    substitution = d[i-1][j-1] + 1
+                    insertion = d[i][j-1] + 1
+                    deletion = d[i-1][j] + 1
+                    d[i][j] = min(substitution, insertion, deletion)
+                
+        return d[len(ref_chars)][len(hyp_chars)] / len(ref_chars)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
