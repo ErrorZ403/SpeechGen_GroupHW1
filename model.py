@@ -9,9 +9,17 @@ from jiwer import wer
 
 from data import RussianNumberNormalizer
 
+def sep_conv(inp, outp, k=5, s=1, p=2):
+    return nn.Sequential(
+        nn.Conv1d(inp, inp, k, s, p, groups=inp, bias=False),
+        nn.Conv1d(inp, outp, 1, bias=False),
+        nn.BatchNorm1d(outp),
+        nn.SiLU(),
+        nn.Dropout(0.15),
+    )
 
 class DigitHybridModel(pl.LightningModule):
-    def __init__(self, input_dim=20, hidden_dim=256, output_dim=11, model_type='hybrid', rnn_type='lstm'):
+    def __init__(self, input_dim=20, hidden_dim=256, output_dim=11, model_type='hybrid', rnn_type='lstm', conv_type='simple'):
         super().__init__()
         self.save_hyperparameters()
         
@@ -19,14 +27,24 @@ class DigitHybridModel(pl.LightningModule):
         self.rnn_type = rnn_type
         
         if model_type in ['cnn', 'hybrid']:
-            self.conv = nn.Sequential(
-                nn.Conv1d(input_dim, 128, kernel_size=11, stride=2, padding=5),
-                nn.ReLU(),
-                nn.Dropout(0.2),
-                nn.Conv1d(128, 128, kernel_size=11, stride=2, padding=5),
-                nn.ReLU(),
-                nn.Dropout(0.2)
-            )
+            if conv_type == 'simple':
+                self.conv = nn.Sequential(
+                    nn.Conv1d(input_dim, 128, kernel_size=11, stride=2, padding=5),
+                    nn.ReLU(),
+                    nn.Dropout(0.2),
+                    nn.Conv1d(128, 128, kernel_size=11, stride=2, padding=5),
+                    nn.ReLU(),
+                    nn.Dropout(0.2)
+                )
+                self.compute_len = self._cnn_out_len
+            else:
+                self.conv = nn.Sequential(
+                    sep_conv(input_dim, 32, 5, 2, 2),  
+                    sep_conv(32, 64, 5, 2, 2), 
+                    sep_conv(64, 128),
+                    sep_conv(128, 128),
+                )
+                self.compute_len = self._len_after_cnn
             cnn_output_dim = 128
         else:
             self.conv = None
@@ -48,9 +66,14 @@ class DigitHybridModel(pl.LightningModule):
         self.criterion = nn.CTCLoss(blank=0, zero_infinity=True)
 
     def _cnn_out_len(self, lens):
-        for _ in range(2):                       # two Conv1d layers
+        for _ in range(2):                      
             lens = (lens + 2*5 - (11-1) - 1) // 2 + 1
         return lens
+    
+    def _len_after_cnn(self, l):
+        for s in (2,2):
+            l = (l+1)//s
+        return l
 
     def forward(self, x):            
         if self.model_type in ['cnn', 'hybrid']:
@@ -89,7 +112,7 @@ class DigitHybridModel(pl.LightningModule):
         outputs = self(spectrograms)
         outputs = outputs.log_softmax(2)
         
-        adjusted_lengths = self._cnn_out_len(spec_lengths.clone())
+        adjusted_lengths = self.compute_len(spec_lengths.clone())
         loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
         
         if batch_idx % 100 == 0:
@@ -116,12 +139,12 @@ class DigitHybridModel(pl.LightningModule):
         outputs = self(spectrograms)
         outputs = outputs.log_softmax(2)
         
-        adjusted_lengths = (spec_lengths / 4).long()
+        adjusted_lengths = self.compute_len(spec_lengths.clone())
         loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
         
         decoded_sequences = self.greedy_decode(outputs, adjusted_lengths)
         targets = targets.cpu().numpy()
-        normalizer = RussianNumberNormalizer()  # Create normalizer instance
+        normalizer = RussianNumberNormalizer()
         
         wers = []
         correct_predictions = 0

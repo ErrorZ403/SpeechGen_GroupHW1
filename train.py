@@ -18,7 +18,7 @@ def main():
     n_fft = 400
     hop_length = 160
 
-    hidden_dim = 512
+    hidden_dim = 384
     output_dim = 11
     model_type = 'hybrid'
     rnn_type = 'lstm'
