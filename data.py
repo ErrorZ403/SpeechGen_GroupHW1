@@ -22,7 +22,7 @@ def collate_fn(batch):
     speaker_ids = [item[2] for item in batch]
     
     spectrograms = pad_sequence(spectrograms, batch_first=True)
-    targets = pad_sequence(targets, batch_first=True, padding_value=0)
+    targets = pad_sequence(targets, batch_first=True, padding_value=11)
     
     return spectrograms, targets, spec_lengths, target_lengths, speaker_ids
 
@@ -34,7 +34,7 @@ class AudioAugmenter:
         self.augmentations = [
             self._add_gaussian_noise,
             #self._time_stretch,
-            self._pitch_shift,
+            #self._pitch_shift,
             self._add_background_noise
         ]
     

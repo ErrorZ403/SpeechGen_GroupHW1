@@ -42,8 +42,8 @@ class DigitHybridModel(pl.LightningModule):
                 self.conv = nn.Sequential(
                     sep_conv(input_dim, 32, 5, 2, 2),  
                     sep_conv(32, 64, 5, 2, 2), 
-                    sep_conv(64, 128),
-                    sep_conv(128, 128),
+                    sep_conv(64, 128, dil=2),
+                    sep_conv(128, 128, dil=2),
                 )
                 self.compute_len = self._len_after_cnn
             cnn_output_dim = 128
@@ -64,7 +64,7 @@ class DigitHybridModel(pl.LightningModule):
             rnn_output_dim = cnn_output_dim
             
         self.fc = nn.Linear(rnn_output_dim, output_dim)
-        self.criterion = nn.CTCLoss(blank=0, zero_infinity=True)
+        self.criterion = nn.CTCLoss(blank=10, zero_infinity=True)
 
     def _cnn_out_len(self, lens):
         for _ in range(2):                      
@@ -100,7 +100,7 @@ class DigitHybridModel(pl.LightningModule):
             prev_token = None
             decoded_seq = []
             for token in seq:
-                if token != 0 and token != prev_token: 
+                if token != 10 and token != prev_token: 
                     decoded_seq.append(str(token))
                 prev_token = token
             
@@ -115,6 +115,13 @@ class DigitHybridModel(pl.LightningModule):
         
         adjusted_lengths = self.compute_len(spec_lengths.clone())
         loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
+
+        log_probs = F.log_softmax(outputs, dim=2)
+        assert (targets[torch.arange(len(targets)), target_lengths-1] != 11).all()
+        assert (targets[torch.arange(len(targets)).unsqueeze(1),
+                torch.arange(targets.shape[1]).unsqueeze(0)]
+        .masked_select(torch.arange(targets.shape[1]) >= target_lengths.unsqueeze(1))
+        == 11).all(), "padding zone has non‑PAD values"
         
         if batch_idx % 100 == 0:
             decoded_sequences = self.greedy_decode(outputs, adjusted_lengths)
