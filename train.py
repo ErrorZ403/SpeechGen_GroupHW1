@@ -21,7 +21,8 @@ def main():
     hidden_dim = 384
     output_dim = 11
     model_type = 'hybrid'
-    rnn_type = 'lstm'
+    rnn_type = 'gru'
+    conv_type = 'imp'
     
     transform = MelSpectrogram(sample_rate=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
     
@@ -38,7 +39,8 @@ def main():
         hidden_dim=hidden_dim,
         output_dim=output_dim,
         model_type=model_type,
-        rnn_type=rnn_type
+        rnn_type=rnn_type,
+        conv_type=conv_type
     )
     
     checkpoint_callback = ModelCheckpoint(

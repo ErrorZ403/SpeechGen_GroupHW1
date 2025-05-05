@@ -9,9 +9,10 @@ from jiwer import wer
 
 from data import RussianNumberNormalizer
 
-def sep_conv(inp, outp, k=5, s=1, p=2):
+def sep_conv(inp, outp, k=5, s=1, p=2, dil=1):
+    pad = (k // 2) * dil
     return nn.Sequential(
-        nn.Conv1d(inp, inp, k, s, p, groups=inp, bias=False),
+        nn.Conv1d(inp, inp, k, s, pad, groups=inp, dilation=dil, bias=False),
         nn.Conv1d(inp, outp, 1, bias=False),
         nn.BatchNorm1d(outp),
         nn.SiLU(),
