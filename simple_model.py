@@ -5,7 +5,6 @@ import torch.nn.functional as F
 
 import pytorch_lightning as pl
 
-from data import RussianNumberNormalizer
 
 
 class DigitHybridModel(pl.LightningModule):
@@ -81,37 +80,3 @@ class DigitHybridModel(pl.LightningModule):
             decoded_sequences.append(''.join(decoded_seq))
             
         return decoded_sequences
-
-    def training_step(self, batch, batch_idx):
-        spectrograms, targets, spec_lengths, target_lengths, speaker_ids = batch
-        outputs = self(spectrograms)
-        outputs = outputs.log_softmax(2)
-        
-        adjusted_lengths = self._cnn_out_len(spec_lengths.clone())
-        loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
-        
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        spectrograms, targets, spec_lengths, target_lengths, speaker_ids = batch
-        outputs = self(spectrograms)
-        outputs = outputs.log_softmax(2)
-        
-        adjusted_lengths = (spec_lengths / 4).long()
-        loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
-        
-        decoded_sequences = self.greedy_decode(outputs, adjusted_lengths)
-        targets = targets.cpu().numpy()
-        normalizer = RussianNumberNormalizer()  # Create normalizer instance
-        
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val_wer"
-            }
-        }
