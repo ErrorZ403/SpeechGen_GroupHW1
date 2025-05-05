@@ -3,6 +3,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 
 from model import DigitHybridModel
 from data import DigitDataset, collate_fn, AudioAugmenter
@@ -12,7 +13,7 @@ from torchaudio.transforms import MelSpectrogram
 def main():
     pl.seed_everything(42)
     
-    n_mels = 60
+    n_mels = 40
     sample_rate = 16000
     n_fft = 400
     hop_length = 160
@@ -51,7 +52,7 @@ def main():
     logger = TensorBoardLogger('logs', name='digit_recognition')
     
     trainer = pl.Trainer(
-        max_epochs=50,
+        max_epochs=10,
         accelerator='gpu' if torch.cuda.is_available() else 'cpu',
         devices=1,
         callbacks=[checkpoint_callback],

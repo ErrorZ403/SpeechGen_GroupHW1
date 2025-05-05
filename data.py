@@ -10,16 +10,14 @@ import re
 
 
 def collate_fn(batch):
-    max_len = min(148, max(spec.shape[1] for spec, _, _ in batch))
+    max_len = max(spec.shape[1] for spec, _, _ in batch)
     
     spectrograms = []
     for spec, _, _ in batch:
-        if spec.shape[1] > max_len:
-            spec = spec[:, :max_len]
         spectrograms.append(spec.squeeze(0).T)
     
     targets = [torch.tensor(item[1]) for item in batch]
-    spec_lengths = torch.tensor([min(spec.shape[0], max_len) for spec in spectrograms])
+    spec_lengths = torch.tensor([spec.shape[0] for spec in spectrograms])
     target_lengths = torch.tensor([len(t) for t in targets])
     speaker_ids = [item[2] for item in batch]
     
@@ -125,9 +123,6 @@ class DigitDataset(Dataset):
             waveform = self.augmenter(waveform)
         
         spectrogram = self.transform(waveform)
-        
-        if spectrogram.shape[2] > self.max_length:
-            spectrogram = spectrogram[:, :, :self.max_length]
         
         target = [int(d) for d in normalized_transcription]
         

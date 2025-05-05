@@ -48,10 +48,12 @@ class DigitHybridModel(pl.LightningModule):
         self.fc = nn.Linear(rnn_output_dim, output_dim)
         self.criterion = nn.CTCLoss(blank=0, zero_infinity=True)
 
-    def forward(self, x):
-        if x.size(1) > 148:
-            x = x[:, :148, :]
-            
+    def _cnn_out_len(self, lens):
+        for _ in range(2):                       # two Conv1d layers
+            lens = (lens + 2*5 - (11-1) - 1) // 2 + 1
+        return lens
+
+    def forward(self, x):            
         if self.model_type in ['cnn', 'hybrid']:
             x = x.transpose(1, 2)
             x = self.conv(x)
@@ -88,7 +90,7 @@ class DigitHybridModel(pl.LightningModule):
         outputs = self(spectrograms)
         outputs = outputs.log_softmax(2)
         
-        adjusted_lengths = (spec_lengths / 4).long()
+        adjusted_lengths = self._cnn_out_len(spec_lengths.clone())
         loss = self.criterion(outputs.permute(1, 0, 2), targets, adjusted_lengths, target_lengths)
         
         if batch_idx % 100 == 0:
