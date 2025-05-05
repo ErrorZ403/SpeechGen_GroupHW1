@@ -107,7 +107,7 @@ class DigitDataset(Dataset):
     def __getitem__(self, idx):
         audio_path = f"{self.root_dir}/{self.data.iloc[idx, 0]}"
         raw_transcription = str(self.data.iloc[idx, 1])
-        speaker_id = self.data.iloc[idx]['speaker_id']
+        speaker_id = self.data.iloc[idx]['spk_id']
         normalized_transcription = self.normalizer.normalize(raw_transcription)
         
         waveform, sample_rate = torchaudio.load(audio_path)

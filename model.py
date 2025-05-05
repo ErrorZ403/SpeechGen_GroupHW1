@@ -5,7 +5,6 @@ import torch.nn.functional as F
 
 import pytorch_lightning as pl
 import torchmetrics
-from ptflops import get_model_complexity_info
 from jiwer import wer
 
 from data import RussianNumberNormalizer
