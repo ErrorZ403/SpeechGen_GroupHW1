@@ -40,10 +40,10 @@ class DigitHybridModel(pl.LightningModule):
                 self.compute_len = self._cnn_out_len
             else:
                 self.conv = nn.Sequential(
-                    sep_conv(input_dim, 32, 5, 2, 2),  
-                    sep_conv(32, 64, 5, 2, 2), 
-                    sep_conv(64, 128, dil=2),
-                    sep_conv(128, 128, dil=2),
+                    sep_conv(input_dim, 128, 5, 2, 2),  
+                    sep_conv(128, 256, 5, 2, 2), 
+                    sep_conv(256, 256, dil=2),
+                    sep_conv(256, 128, dil=2),
                 )
                 self.compute_len = self._len_after_cnn
             cnn_output_dim = 128
