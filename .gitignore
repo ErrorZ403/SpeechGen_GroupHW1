@@ -3,3 +3,5 @@ logs
 checkpoints
 data
 checkpoint_for_submit
+checkpoints_for_submit
+.venv

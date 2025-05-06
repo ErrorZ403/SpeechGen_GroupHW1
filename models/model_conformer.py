@@ -8,7 +8,7 @@ import torchmetrics
 from jiwer import wer
 from torchaudio.models import Conformer
 
-from data import RussianNumberNormalizer
+from data_utils.data import RussianNumberNormalizer
 
 def sep_conv(inp, outp, k=5, s=1, p=2, dil=1):
     pad = (k // 2) * dil

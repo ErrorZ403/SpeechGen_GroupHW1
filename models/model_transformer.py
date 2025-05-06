@@ -7,7 +7,7 @@ import pytorch_lightning as pl
 import torchmetrics
 from jiwer import wer
 
-from data import RussianNumberNormalizer
+from data_utils.data import RussianNumberNormalizer
 
 def sep_conv(inp, outp, k=5, s=1, p=2):
     return nn.Sequential(
