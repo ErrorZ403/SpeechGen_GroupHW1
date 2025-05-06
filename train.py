@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
-from model import DigitHybridModel
-from model_arch import DigitHybridModel as SuperModel
+from models.model import DigitHybridModel
+from models.model_conformer import DigitHybridModel as SuperModel
 from data import DigitDataset, collate_fn, AudioAugmenter
 #from new_data import DigitDataset as ImpDigitDataset, collate_fn
 from torchaudio.transforms import MelSpectrogram

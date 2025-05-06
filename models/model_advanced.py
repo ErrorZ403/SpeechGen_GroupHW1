@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 import torchmetrics
 from jiwer import wer
 
-from new_data import NumberNormalizer
+from data_utils.advanced_data import NumberNormalizer
 
 def sep_conv(inp, outp, k=5, s=1, p=2, dil=1):
     pad = (k // 2) * dil
